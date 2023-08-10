@@ -31,6 +31,12 @@ import pathlib
 import sys
 from urllib import request
 
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+import pandas as pd
+from pandas import read_csv
+from datetime import datetime
+
 
 def url_file_name(url: str) -> str:
     """
@@ -72,30 +78,71 @@ def download(url: str, file_path: str) -> None:
 
 @dataclass()
 class M4Dataset:
-    ids: np.ndarray
-    groups: np.ndarray
-    frequencies: np.ndarray
-    horizons: np.ndarray
+    #ids: np.ndarray
+    #groups: np.ndarray
+    #frequencies: np.ndarray
+    #horizons: np.ndarray
     values: np.ndarray
 
     @staticmethod
-    def load(training: bool = True, dataset_file: str = '../dataset/m4') -> 'M4Dataset':
+    def load(training, dataset_file, N_REGRESS, MAX_STEPS) -> 'M4Dataset':
         """
         Load cached dataset.
 
         :param training: Load training part if training is True, test part otherwise.
         """
         info_file = os.path.join(dataset_file, 'M4-info.csv')
-        train_cache_file = os.path.join(dataset_file, 'training.npz')
-        test_cache_file = os.path.join(dataset_file, 'test.npz')
-        m4_info = pd.read_csv(info_file)
-        return M4Dataset(ids=m4_info.M4id.values,
-                         groups=m4_info.SP.values,
-                         frequencies=m4_info.Frequency.values,
-                         horizons=m4_info.Horizon.values,
-                         values=np.load(
-                             train_cache_file if training else test_cache_file,
-                             allow_pickle=True))
+        #train_cache_file = os.path.join(dataset_file, 'training.npz')
+        #test_cache_file = os.path.join(dataset_file, 'test.npz')
+        #m4_info = pd.read_csv(info_file)
+        
+        def parser(x):
+                return datetime.strptime(x, "%Y-%m-%dT%H:%M+10:00")
+		
+        series_or = read_csv('./dataset/m4/aemo_2018.csv', header=0, parse_dates=[0], sep=",", index_col=0, date_parser=parser)
+        grupo_usi=['GUNNING1','GULLRWF1','CAPTL_WF','TARALGA1','CULLRGWF','WOODLWN1']
+        t_ini_tr=datetime.strptime("02/01/2018 00:00", "%d/%m/%Y %H:%M")
+        t_fim_tr=datetime.strptime("30/08/2018 00:00", "%d/%m/%Y %H:%M")
+        t_ini_ts=datetime.strptime("01/09/2018 00:00", "%d/%m/%Y %H:%M")
+        t_fim_ts=datetime.strptime("30/12/2018 00:00", "%d/%m/%Y %H:%M")
+        #N_REGRESS = self.args.seq_len   #12 nº de regressores
+        #MAX_STEPS = self.args.pred_len    # horizonte máximo de previsão na simulação
+
+        usi=grupo_usi[0]		
+        series_ds=pd.Series(series_or.loc[:,usi])
+        series_ds = series_ds.resample('30T').mean()  # converte para 30min
+        series_ds=pd.Series(series_ds.values, index=series_ds.index.shift(1, freq='25T'))
+        pot = series_ds.max()
+        series_ds=series_ds/pot
+        series_ds[series_ds<0]=0
+        series_ds[series_ds.isnull()]=0
+        #
+        series_temp=series_ds
+        for i in range(1,N_REGRESS + MAX_STEPS):
+            temp=series_ds.shift(i)
+            series_temp=pd.concat([temp,series_temp],axis=1)
+        #
+        series_temp1=series_temp[t_ini_tr:t_fim_tr]
+        series_temp2=series_temp[t_ini_ts:t_fim_ts]
+        #
+        x_train = series_temp1.iloc[:,0:N_REGRESS]
+        y_train = series_temp1.iloc[:,N_REGRESS:N_REGRESS + MAX_STEPS]
+        x_test = series_temp2.iloc[:,0:N_REGRESS]
+        y_test = series_temp2.iloc[:,N_REGRESS:N_REGRESS + MAX_STEPS]
+        
+        if training:
+         values2=np.concatenate((x_train.values,y_train.values),axis=1)
+        else:
+         values2=np.concatenate((x_test.values,y_test.values),axis=1)
+		
+        return M4Dataset(#ids=m4_info.M4id.values,
+                         #groups=m4_info.SP.values,
+                         #frequencies=m4_info.Frequency.values,
+                         #horizons=m4_info.Horizon.values,
+						 values=values2)
+                         #values=np.load(
+                         #    train_cache_file if training else test_cache_file,
+                         #    allow_pickle=True))
 
 
 @dataclass()

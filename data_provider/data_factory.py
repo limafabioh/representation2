@@ -33,7 +33,8 @@ def data_provider(args, flag):
             batch_size = 1  # bsz=1 for evaluation
         freq = args.freq
     else:
-        shuffle_flag = True
+        #shuffle_flag = True
+        shuffle_flag = False
         drop_last = True
         batch_size = args.batch_size  # bsz for train and valid
         freq = args.freq
@@ -72,7 +73,7 @@ def data_provider(args, flag):
     else:
         if args.data == 'm4':
             drop_last = False
-        data_set = Data(
+        data_set = Data(                       # cria obj data_set da classe Dataset_M4
             root_path=args.root_path,
             data_path=args.data_path,
             flag=flag,

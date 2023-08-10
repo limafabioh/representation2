@@ -718,7 +718,7 @@ class Dataset_Custom(Dataset):
         return self.scaler.inverse_transform(data)
 
 
-class Dataset_M4(Dataset):
+class Dataset_M4(Dataset):   #classe (dataset) é do torch
     def __init__(self, root_path, flag='pred', size=None,
                  features='S', data_path='ETTh1.csv',
                  target='OT', scale=False, inverse=False, timeenc=0, freq='15min',
@@ -746,16 +746,17 @@ class Dataset_M4(Dataset):
     def __read_data__(self):
         # M4Dataset.initialize()
         if self.flag == 'train':
-            dataset = M4Dataset.load(training=True, dataset_file=self.root_path)
+            dataset = M4Dataset.load(training=True, dataset_file=self.root_path, N_REGRESS = self.seq_len, MAX_STEPS = self.pred_len)
         else:
-            dataset = M4Dataset.load(training=False, dataset_file=self.root_path)
-        training_values = np.array(
-            [v[~np.isnan(v)] for v in
-             dataset.values[dataset.groups == self.seasonal_patterns]])  # split different frequencies
-        self.ids = np.array([i for i in dataset.ids[dataset.groups == self.seasonal_patterns]])
+            dataset = M4Dataset.load(training=False, dataset_file=self.root_path, N_REGRESS = self.seq_len, MAX_STEPS = self.pred_len)
+        training_values = np.array(dataset.values)
+		#training_values = np.array(
+        #    [v[~np.isnan(v)] for v in
+        #     dataset.values[dataset.groups == self.seasonal_patterns]])  # split different frequencies
+        #self.ids = np.array([i for i in dataset.ids[dataset.groups == self.seasonal_patterns]])
         self.timeseries = [ts for ts in training_values]
 
-    def __getitem__(self, index):
+    def __getitem__(self, index):   #executado no loop da batch
         insample = np.zeros((self.seq_len, 1))
         insample_mask = np.zeros((self.seq_len, 1))
         outsample = np.zeros((self.pred_len + self.label_len, 1))
@@ -767,11 +768,13 @@ class Dataset_M4(Dataset):
                                       size=1)[0]
 
         insample_window = sampled_timeseries[max(0, cut_point - self.seq_len):cut_point]
-        insample[-len(insample_window):, 0] = insample_window
+        #insample[-len(insample_window):, 0] = insample_window
+        insample[:,0] = sampled_timeseries[0:self.seq_len]  ########## alterado!
         insample_mask[-len(insample_window):, 0] = 1.0
         outsample_window = sampled_timeseries[
                            cut_point - self.label_len:min(len(sampled_timeseries), cut_point + self.pred_len)]
-        outsample[:len(outsample_window), 0] = outsample_window
+        #outsample[:len(outsample_window), 0] = outsample_window
+        outsample[:,0] = sampled_timeseries[self.seq_len-1:self.seq_len+self.pred_len]  ########## alterado!
         outsample_mask[:len(outsample_window), 0] = 1.0
         return insample, outsample, insample_mask, outsample_mask
 
@@ -791,7 +794,7 @@ class Dataset_M4(Dataset):
         insample = np.zeros((len(self.timeseries), self.seq_len))
         insample_mask = np.zeros((len(self.timeseries), self.seq_len))
         for i, ts in enumerate(self.timeseries):
-            ts_last_window = ts[-self.seq_len:]
+            ts_last_window = ts[-(self.seq_len+self.pred_len):-self.pred_len]
             insample[i, -len(ts):] = ts_last_window
             insample_mask[i, -len(ts):] = 1.0
         return insample, insample_mask

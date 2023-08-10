@@ -64,8 +64,7 @@ class smape_loss(nn.Module):
         :param mask: 0/1 mask. Shape: batch, time
         :return: Loss value
         """
-        return 200 * t.mean(divide_no_nan(t.abs(forecast - target),
-                                          t.abs(forecast.data) + t.abs(target.data)) * mask)
+        return 200 * t.mean(divide_no_nan(t.abs(forecast - target), t.abs(forecast.data) + t.abs(target.data)) * mask)
 
 
 class mase_loss(nn.Module):

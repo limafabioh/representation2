@@ -8,7 +8,10 @@ from exp.exp_anomaly_detection import Exp_Anomaly_Detection
 from exp.exp_classification import Exp_Classification
 import random
 import numpy as np
+import time
+import matplotlib.pyplot as plt
 
+start_time = time.time()
 
 fix_seed = 2021
 random.seed(fix_seed)
@@ -37,9 +40,9 @@ parser.add_argument('--freq', type=str, default='h',
 parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
 
 # forecasting task
-parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
-parser.add_argument('--label_len', type=int, default=48, help='start token length')
-parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
+parser.add_argument('--seq_len', type=int, default=12, help='input sequence length')    #####
+parser.add_argument('--label_len', type=int, default=1, help='start token length')    #####
+parser.add_argument('--pred_len', type=int, default=1, help='prediction sequence length')    #####
 parser.add_argument('--seasonal_patterns', type=str, default='Monthly', help='subset for M4')
 
 # inputation task
@@ -54,8 +57,8 @@ parser.add_argument('--num_kernels', type=int, default=6, help='for Inception')
 parser.add_argument('--enc_in', type=int, default=1, help='encoder input size')
 parser.add_argument('--dec_in', type=int, default=1, help='decoder input size')
 parser.add_argument('--c_out', type=int, default=1, help='output size')
-parser.add_argument('--d_model', type=int, default=128, help='dimension of model')
-parser.add_argument('--n_heads', type=int, default=8, help='num of heads')
+parser.add_argument('--d_model', type=int, default=128, help='dimension of model') #128
+parser.add_argument('--n_heads', type=int, default=8, help='num of heads') #8
 parser.add_argument('--e_layers', type=int, default=2, help='num of encoder layers')
 parser.add_argument('--d_layers', type=int, default=1, help='num of decoder layers')
 parser.add_argument('--d_ff', type=int, default=128, help='dimension of fcn')
@@ -71,14 +74,15 @@ parser.add_argument('--activation', type=str, default='gelu', help='activation')
 parser.add_argument('--output_attention', action='store_true', help='whether to output attention in ecoder')
 
 # optimization
-parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
+parser.add_argument('--num_workers', type=int, default=0, help='data loader num workers')
 parser.add_argument('--itr', type=int, default=1, help='experiments times')
-parser.add_argument('--train_epochs', type=int, default=1, help='train epochs')
-parser.add_argument('--batch_size', type=int, default=16, help='batch size of train input data')
+parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')  ######
+parser.add_argument('--batch_size', type=int, default=16, help='batch size of train input data')  ##16
 parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
-parser.add_argument('--learning_rate', type=float, default=0.002, help='optimizer learning rate')
+parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')  #####
 parser.add_argument('--des', type=str, default='Exp', help='exp description')
 parser.add_argument('--loss', type=str, default='MSE', help='loss function')
+#parser.add_argument('--loss', type=str, default='SMAPE', help='loss function')
 parser.add_argument('--lradj', type=str, default='type1', help='adjust learning rate')
 parser.add_argument('--use_amp', action='store_true', help='use automatic mixed precision training', default=False)
 
@@ -96,7 +100,7 @@ parser.add_argument('--p_hidden_layers', type=int, default=2, help='number of hi
 # patching
 parser.add_argument('--patch_size', type=int, default=1)
 parser.add_argument('--stride', type=int, default=1)
-parser.add_argument('--gpt_layers', type=int, default=4)
+parser.add_argument('--gpt_layers', type=int, default=6)
 parser.add_argument('--ln', type=int, default=0)
 parser.add_argument('--mlp', type=int, default=0)
 parser.add_argument('--weight', type=float, default=0)
@@ -155,7 +159,7 @@ if args.is_training:
         exp.train(setting)
 
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-        exp.test(setting)
+        preds,trues,mse,hor = exp.test(setting)
         torch.cuda.empty_cache()
 else:
     ii = 0
@@ -183,3 +187,15 @@ else:
     print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
     # exp.test(setting, test=1)
     torch.cuda.empty_cache()
+
+print("--- %s seconds ---" % (time.time() - start_time))
+print ("HORIZONTE:", hor,"/ MSE TEST:",mse)
+
+plt.figure()
+plt.plot(preds, color = 'red', label = 'Previsões',linewidth=0.8)
+plt.plot(trues, color = 'blue', label='Test Data',linewidth=0.8)
+plt.legend()
+plt.show()
+plt.savefig("HOR"+str(hor), dpi=600)
+
+
